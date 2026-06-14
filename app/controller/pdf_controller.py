@@ -1,48 +1,95 @@
+# Importa o tipo Optional do módulo typing.
+# Optional[str] significa que uma variável pode ser uma string OU None.
 from typing import Optional
-from datetime import datetime
+
+# Importa BytesIO.
+# Permite transformar um array de bytes (blob do banco)
+# em um arquivo que pode ser enviado ao navegador.
 from io import BytesIO
 
-from fastapi import (
-    APIRouter,
-    Request,
-    HTTPException,
-    UploadFile,
-    File,
-    Form
-)
 
+# Importa os componentes principais do FastAPI.
+
+# APIRouter:
+# Permite organizar endpoints em módulos separados.
+#
+# Request:
+# Representa a requisição HTTP recebida.
+# Permite acessar headers, query params, cookies, etc.
+#
+# HTTPException:
+# Utilizada para retornar erros HTTP padronizados.
+#
+# UploadFile:
+# Representa um arquivo enviado pelo cliente.
+#
+# File:
+# Informa ao FastAPI que o parâmetro é um arquivo.
+#
+# Form:
+# Informa ao FastAPI que o parâmetro vem de multipart/form-data.
+from fastapi import APIRouter, Request, HTTPException, UploadFile, File, Form
+
+
+# StreamingResponse permite devolver arquivos para o cliente.
+# Ideal para PDFs, imagens, vídeos e arquivos grandes.
 from fastapi.responses import StreamingResponse
 
-from db.session import SessionLocal
 
-from app.models.pdf_model import PDFFile
-from app.models.pacientes_model import Paciente
-from app.models.setores_model import Setor
-from app.models.leitos_model import Leito
+# Importa funções da camada Service.
+#
+# upload_pdf:
+# Responsável pela regra de negócio do upload.
+#
+# get_pdf_service:
+# Responsável pela busca do PDF.
+#
+# O controller não acessa banco diretamente.
+# Ele delega a responsabilidade para a camada Service.
+from app.services.pdf_service import get_pdf as get_pdf_service, upload_pdf
 
+
+# Cria um agrupamento de rotas.
+#
+# Todas as rotas deste arquivo terão o prefixo /pdf.
+#
+# Exemplo:
+# @router.post("/upload_blob")
+# vira:
+# POST /pdf/upload_blob
 router = APIRouter(
+
+    # Prefixo comum das rotas
     prefix="/pdf",
+
+    # Grupo exibido no Swagger
     tags=["PDF"]
 )
 
 
-def parse_iso_date(value: Optional[str]) -> Optional[datetime]:
-    if not value:
-        return None
-
-    try:
-        return datetime.fromisoformat(value)
-    except ValueError:
-        return None
-
-
+# Define endpoint POST.
+#
+# URL final:
+# POST /pdf/upload_blob
 @router.post("/upload_blob")
 async def upload_pdf_blob(
+
+    # Objeto Request contendo toda requisição HTTP.
     request: Request,
+
+    # Arquivo obrigatório.
+    #
+    # File(...) => obrigatório.
     file: UploadFile = File(...),
+
+    # Campos obrigatórios do formulário.
     cd_paciente: str = Form(...),
     cd_atendimento: str = Form(...),
     nm_paciente: str = Form(...),
+
+    # Campos opcionais.
+    #
+    # Form(None) => não obrigatório.
     cd_objeto: Optional[str] = Form(None),
     cd_setor: Optional[str] = Form(None),
     nm_setor: Optional[str] = Form(None),
@@ -55,187 +102,180 @@ async def upload_pdf_blob(
     dh_impresso: Optional[str] = Form(None),
     tp_status: Optional[str] = Form(None)
 ):
-    db = SessionLocal()
 
+    # Bloco de tratamento de erros.
     try:
 
+        # Obtém parâmetro da URL.
+        #
+        # Exemplo:
+        # /pdf/upload_blob?id=10
+        #
+        # Resultado:
+        # id_param = "10"
         id_param = request.query_params.get("id")
 
+        # Verifica se o usuário enviou o parâmetro.
         if not id_param:
+
+            # Retorna erro HTTP 400.
             raise HTTPException(
                 status_code=400,
                 detail="Parâmetro 'id' obrigatório"
             )
 
+        # Tenta converter o parâmetro para inteiro.
         try:
+
             documento_id = int(id_param)
-        except ValueError:
+
+        # Caso não seja número.
+        except ValueError as exc:
+
             raise HTTPException(
                 status_code=400,
                 detail="Parâmetro 'id' inválido"
-            )
+            ) from exc
 
+        # Lê todo conteúdo do PDF enviado.
+        #
+        # Retorna bytes.
+        #
+        # Exemplo:
+        # b'%PDF-1.7....'
         content = await file.read()
+        print("PDF recebido")
+        print("Documento clinico:", documento_id)
+        print("Paciente:", cd_paciente)
+        # Chama camada Service.
+        #
+        # O Controller apenas recebe os dados.
+        #
+        # Toda regra de negócio deve estar na Service.
+        result = upload_pdf(
 
-        tamanho = len(content)
+                
+            # Id do documento
+            documento_id=documento_id,
 
-        MAX_SIZE = 5 * 1024 * 1024
+            # Conteúdo binário do PDF
+            content=content,
 
-        if tamanho > MAX_SIZE:
-            raise HTTPException(
-                status_code=413,
-                detail="PDF excede o tamanho máximo permitido"
-            )
+            # Metadados do documento
+            data={
 
-        pdf_existente = (
-            db.query(PDFFile)
-            .filter(PDFFile.id == documento_id)
-            .first()
+                "cd_paciente": cd_paciente,
+                "cd_atendimento": cd_atendimento,
+                "nm_paciente": nm_paciente,
+                "cd_objeto": cd_objeto,
+                "cd_setor": cd_setor,
+                "nm_setor": nm_setor,
+                "cd_leito": cd_leito,
+                "ds_leito": ds_leito,
+                "cd_tipo_documento": cd_tipo_documento,
+                "ds_tipo_documento": ds_tipo_documento,
+                "nm_documento": nm_documento,
+                "dh_fechamento": dh_fechamento,
+                "dh_impresso": dh_impresso,
+                "tp_status": tp_status,
+            },
         )
 
-        is_update = pdf_existente is not None
-
-        paciente = (
-            db.query(Paciente)
-            .filter(
-                Paciente.cd_paciente == int(cd_paciente)
-            )
-            .first()
-        )
-
-        if not paciente:
-            paciente = Paciente(
-                cd_paciente=int(cd_paciente),
-                nm_paciente=nm_paciente
-            )
-            db.add(paciente)
-        else:
-            paciente.nm_paciente = nm_paciente
-
-        if cd_setor and nm_setor:
-
-            setor = (
-                db.query(Setor)
-                .filter(Setor.cd_setor == cd_setor)
-                .first()
-            )
-
-            if not setor:
-                setor = Setor(
-                    cd_setor=cd_setor,
-                    nm_setor=nm_setor
-                )
-                db.add(setor)
-
-        if cd_leito and ds_leito:
-
-            leito = (
-                db.query(Leito)
-                .filter(Leito.cd_leito == cd_leito)
-                .first()
-            )
-
-            if not leito:
-                leito = Leito(
-                    cd_leito=cd_leito,
-                    ds_leito=ds_leito
-                )
-                db.add(leito)
-
-        if is_update:
-
-            pdf_existente.cd_paciente = cd_paciente
-            pdf_existente.cd_atendimento = cd_atendimento
-            pdf_existente.nm_paciente = nm_paciente
-            pdf_existente.cd_objeto = cd_objeto
-            pdf_existente.cd_setor = cd_setor
-            pdf_existente.nm_setor = nm_setor
-            pdf_existente.cd_leito = cd_leito
-            pdf_existente.ds_leito = ds_leito
-            pdf_existente.cd_tipo_documento = cd_tipo_documento
-            pdf_existente.ds_tipo_documento = ds_tipo_documento or ""
-            pdf_existente.nm_documento = nm_documento or ""
-            pdf_existente.tp_status = tp_status
-            pdf_existente.dh_documento_fechado = parse_iso_date(dh_fechamento)
-            pdf_existente.dh_documento_importado = parse_iso_date(dh_impresso)
-            pdf_existente.pdf_blob = content
-
-            db.add(pdf_existente)
-
-        else:
-
-            novo_pdf = PDFFile(
-                id=documento_id,
-                cd_paciente=cd_paciente,
-                cd_atendimento=cd_atendimento,
-                nm_paciente=nm_paciente,
-                cd_objeto=cd_objeto,
-                cd_setor=cd_setor,
-                nm_setor=nm_setor,
-                cd_leito=cd_leito,
-                ds_leito=ds_leito,
-                cd_tipo_documento=cd_tipo_documento,
-                ds_tipo_documento=ds_tipo_documento or "",
-                nm_documento=nm_documento or "",
-                tp_status=tp_status,
-                dh_documento_fechado=parse_iso_date(dh_fechamento),
-                dh_documento_importado=parse_iso_date(dh_impresso),
-                pdf_blob=content
-            )
-
-            db.add(novo_pdf)
-
-        db.commit()
-
+        # Retorna resposta JSON para o cliente.
         return {
-            "message": "PDF salvo com sucesso" if not is_update else "PDF atualizado com sucesso",
-            "id": documento_id,
-            "size": tamanho,
-            "updated": is_update
+
+            # Mensagem de sucesso.
+            "message": result["message"],
+
+            # Id salvo.
+            "id": result["id"],
+
+            # Tamanho do arquivo.
+            "size": result["size"],
+
+            # True se atualizou.
+            # False se inseriu.
+            "updated": result["updated"],
         }
 
-    except HTTPException:
-        raise
+    # Captura erros de validação vindos da Service.
+    except ValueError as exc:
 
-    except Exception as e:
+        # Define status HTTP baseado na mensagem.
+        #
+        # Exemplo:
+        # "PDF excede tamanho máximo"
+        # => 413
+        status_code = (
+            413
+            if "tamanho máximo" in str(exc).lower()
+            else 400
+        )
 
-        db.rollback()
+        raise HTTPException(
+            status_code=status_code,
+            detail=str(exc)
+        ) from exc
+
+    # Captura erros internos da aplicação.
+    except RuntimeError as exc:
 
         raise HTTPException(
             status_code=500,
-            detail=f"Erro interno: {str(e)}"
-        )
+            detail=str(exc)
+        ) from exc
 
-    finally:
-        db.close()
+    # Repassa erros HTTP já tratados.
+    except HTTPException:
+        raise
 
 
+# Endpoint GET.
+#
+# Exemplo:
+# GET /pdf/15
 @router.get("/{id}")
 def obter_pdf(id: int):
 
-    db = SessionLocal()
-
     try:
 
-        pdf = (
-            db.query(PDFFile)
-            .filter(PDFFile.id == id)
-            .first()
-        )
+        # Busca PDF através da camada Service.
+        pdf = get_pdf_service(id)
 
+        # Caso não encontre registro.
         if not pdf:
+
             raise HTTPException(
                 status_code=404,
                 detail="PDF não encontrado"
             )
 
+        # Retorna arquivo PDF para o navegador.
         return StreamingResponse(
+
+            # Converte bytes para stream.
+            #
+            # O navegador entende como arquivo.
             BytesIO(pdf.pdf_blob),
+
+            # MIME Type.
+            #
+            # Informa ao navegador que é PDF.
             media_type="application/pdf",
+
+            # Cabeçalhos HTTP.
             headers={
-                "Content-Disposition": f'inline; filename="{pdf.nm_documento}"'
+
+                # inline:
+                # abre diretamente no navegador.
+                #
+                # attachment:
+                # forçaria download.
+                "Content-Disposition":
+                    f'inline; filename="{pdf.nm_documento}"'
             }
         )
 
-    finally:
-        db.close()
+    # Repassa exceções HTTP.
+    except HTTPException:
+        raise
