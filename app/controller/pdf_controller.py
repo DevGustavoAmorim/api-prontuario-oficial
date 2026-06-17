@@ -86,15 +86,22 @@ async def upload_pdf_blob(
     cd_paciente: str = Form(...),
     cd_atendimento: str = Form(...),
     nm_paciente: str = Form(...),
-
+    idade_paciente: str = Form(...),
+    sexo_paciente: str = Form(...),
+    sn_alta:  str = Form(...),
+    
     # Campos opcionais.
-    #
     # Form(None) => não obrigatório.
+    dt_alta: Optional[str] = Form(None),
     cd_objeto: Optional[str] = Form(None),
+    cd_multi_empresa: Optional[str] = Form(None),
+    ds_multi_empresa: Optional[str] = Form(None),
     cd_setor: Optional[str] = Form(None),
     nm_setor: Optional[str] = Form(None),
     cd_leito: Optional[str] = Form(None),
     ds_leito: Optional[str] = Form(None),
+    cd_unid_int: Optional[str] = Form(None),
+    ds_unid_int: Optional[str] = Form(None),
     cd_tipo_documento: Optional[str] = Form(None),
     ds_tipo_documento: Optional[str] = Form(None),
     nm_documento: Optional[str] = Form(None),
@@ -163,22 +170,29 @@ async def upload_pdf_blob(
 
             # Metadados do documento
             data={
-
-                "cd_paciente": cd_paciente,
-                "cd_atendimento": cd_atendimento,
-                "nm_paciente": nm_paciente,
-                "cd_objeto": cd_objeto,
-                "cd_setor": cd_setor,
-                "nm_setor": nm_setor,
-                "cd_leito": cd_leito,
-                "ds_leito": ds_leito,
-                "cd_tipo_documento": cd_tipo_documento,
-                "ds_tipo_documento": ds_tipo_documento,
-                "nm_documento": nm_documento,
-                "dh_fechamento": dh_fechamento,
-                "dh_impresso": dh_impresso,
-                "tp_status": tp_status,
-            },
+                    "cd_paciente": cd_paciente,
+                    "cd_atendimento": cd_atendimento,
+                    "nm_paciente": nm_paciente,
+                    "idade_paciente": idade_paciente,
+                    "sexo_paciente": sexo_paciente,
+                    "sn_alta": sn_alta,
+                    "dt_alta": dt_alta,
+                    "cd_objeto": cd_objeto,
+                    "cd_multi_empresa": cd_multi_empresa,
+                    "ds_multi_empresa": ds_multi_empresa,
+                    "cd_setor": cd_setor,
+                    "nm_setor": nm_setor,
+                    "cd_leito": cd_leito,
+                    "ds_leito": ds_leito,
+                    "cd_unid_int": cd_unid_int,
+                    "ds_unid_int": ds_unid_int,
+                    "cd_tipo_documento": cd_tipo_documento,
+                    "ds_tipo_documento": ds_tipo_documento,
+                    "nm_documento": nm_documento,
+                    "dh_fechamento": dh_fechamento,
+                    "dh_impresso": dh_impresso,
+                    "tp_status": tp_status,
+                },
         )
 
         # Retorna resposta JSON para o cliente.

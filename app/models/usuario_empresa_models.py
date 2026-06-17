@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, UniqueConstraint
 
-from app.database.connection import Base
+from db.base import Base
 
 
 class UsuarioEmpresa(Base):

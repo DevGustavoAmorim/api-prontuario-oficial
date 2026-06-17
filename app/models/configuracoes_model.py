@@ -4,17 +4,18 @@ from typing import Any, Dict
 from sqlalchemy import Boolean, Column, DateTime, Integer, JSON
 from db.base import Base
 
-
 class Configuracoes(Base):
     __tablename__ = 'configuracoes'
 
-    id = Column(Integer, primary_key=True, index=True)
+    cd_configuração = Column(Integer, primary_key=True, index=True)
     tempo_prontuarios = Column(Integer, nullable=False, default=30)
     documentos_por_setor = Column(JSON, nullable=False, default=dict)
     outras_configuracoes = Column(JSON, nullable=False, default=dict)
-    ativo = Column(Boolean, nullable=False, default=True)
     criado_em = Column(DateTime, nullable=False, default=datetime.utcnow)
     atualizado_em = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    dias_delete_documentos = Column(Integer, nullable=False, default=2)
+    ativo = Column(Boolean, nullable=False, default=True)
+    tipo_documento = Column(Integer, default=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {

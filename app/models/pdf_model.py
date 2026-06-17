@@ -4,7 +4,7 @@ from db.base import Base
 class PDFFile(Base):
     __tablename__ = "atendimento"
 
-    id = Column(Integer, primary_key=True, index=True)  # cd_documento_clinico
+    cd_documento_clinico = Column(Integer, primary_key=True, index=True)
     cd_paciente = Column(String, nullable=False)
     cd_atendimento = Column(String, nullable=True)
     nm_paciente = Column(String, nullable=False)

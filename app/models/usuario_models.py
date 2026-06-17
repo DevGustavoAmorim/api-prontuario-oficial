@@ -2,23 +2,29 @@ from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
 from db.base import Base
 from sqlalchemy.orm import relationship
 
-
 class Usuario(Base):
     """
     Modelo de dados para a tabela 'usuarios' no banco de dados.
-    Guarda apenas os dados cadastrais e de autenticação do usuário.
-    Os papéis e empresas agora são gerenciados pela tabela de vínculos.
     """
     __tablename__ = "usuarios"
 
-    id = Column(Integer, primary_key=True, index=True)
+    cd_usuario = Column(Integer, primary_key=True, index=True)
     nome = Column(String(150), nullable=False)
     email = Column(String(150), unique=True, nullable=False)
     senha = Column(String(255), nullable=False)
     ativo = Column(Boolean, default=True)
 
-    # Relacionamento para conseguir acessar todos os vínculos do usuário a partir dele
+    # Relacionamento Multiempresa já existente
     vinculos = relationship("VinculoUsuarioEmpresa", back_populates="usuario")
+
+    # NOVO RELACIONAMENTO: Acesso direto às unidades de internação permitidas
+    # Obs: Altere "UnidadeInternacao" para o nome exato da sua classe de unidades
+    unidades = relationship(
+        "Unid_Int", 
+        secondary="Usuario_Unid_Int", 
+        back_populates="usuarios"
+    )
+
 
 
 class VinculoUsuarioEmpresa(Base):
